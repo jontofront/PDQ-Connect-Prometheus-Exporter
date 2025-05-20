@@ -1,75 +1,54 @@
 import time
 import requests
 from prometheus_client import start_http_server, Gauge
-from collections import defaultdict
 
-EXPORTER_VERSION = "0.1.0"
-
-# ==================== CONFIGURATION ====================
-API_KEY = 'redacted'  # <-- Put your real PDQ API key here!
+# Constants
+API_KEY = 'redacted'  # Replace with your actual API key
 BASE_URL = 'https://app.pdq.com/v1/api'
-PORT = 8000
-SYNC_INTERVAL = 60 * 60 * 24  # Synchronize only once per day (24 hours)
-# =======================================================
 
-# ----------- HARDWARE METRICS DEFINITIONS --------------
+# Prometheus metrics definitions
 device_count = Gauge('pdq_device_count', 'Total number of devices managed by PDQ Connect')
 device_info = Gauge('pdq_device_info', 'Basic information about the device', [
     'hostname', 'architecture', 'id', 'insertedAt', 'lastUser',
     'model', 'name', 'osVersion', 'publicIpAddress', 'serialNumber', 'servicePack'
 ])
-# Add more hardware metrics here if needed
-# -------------------------------------------------------
+disk_info = Gauge('pdq_disk_info', 'Information about the device disks', [
+    'hostname', 'disk_id', 'model', 'mediaType', 'totalSpaceKb'
+])
+driver_info = Gauge('pdq_driver_info', 'Information about the device drivers', [
+    'hostname', 'driver_id', 'name', 'version', 'provider'
+])
+ad_info = Gauge('pdq_ad_info', 'Active Directory information about the device', [
+    'hostname', 'deviceName'
+])
+custom_fields_info = Gauge('pdq_custom_fields_info', 'Custom fields information about the device', [
+    'hostname', 'field_name', 'field_value'
+])
 
-# ----------- SOFTWARE METRICS DEFINITIONS --------------
-software_total = Gauge('pdq_software_total', 'Total installs per software', ['software'])
-software_updated = Gauge('pdq_software_updated', 'Updated installs (latest version) per software', ['software'])
-software_updated_percent = Gauge('pdq_software_updated_percent', 'Percentage of installs updated to latest version', ['software'])
-software_latest_version = Gauge('pdq_software_latest_version', 'Latest version per software', ['software', 'latest_version'])
-software_version_count = Gauge('pdq_software_version_count', 'Install count per software version', ['software', 'version'])
-# -------------------------------------------------------
-
+# Function to get devices from PDQ Connect API
 def get_devices():
-    """
-    Retrieves all devices from the PDQ Connect API, including installed software.
-    Returns a list of device dictionaries.
-    """
-    devices = []
-    page = 1
-    while True:
-        params = {
-            "includes": "software,disks,drivers,features,networking,processors,updates,activeDirectory,activeDirectoryGroups,customFields",
-            "pageSize": 100,
-            "page": page,
-            "sort": "insertedAt"
-        }
-        url = f'{BASE_URL}/devices'
-        headers = {
-            "Authorization": f"Bearer {API_KEY}",
-            "accept": "application/json"
-        }
-        print(f"Fetching page {page} from {url}")
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        data = response.json()
-        batch = data.get("data", [])
-        if not batch:
-            break
-        devices.extend(batch)
-        if len(batch) < params["pageSize"]:
-            break
-        page += 1
-    print(f"Fetched {len(devices)} devices.")
-    return devices
+    url = f'{BASE_URL}/devices'
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "accept": "application/json"
+    }
+    params = {
+        "includes": "disks,drivers,features,networking,processors,updates,software,activeDirectory,activeDirectoryGroups,customFields",
+        "pageSize": 100,
+        "page": 1,
+        "sort": "insertedAt"
+    }
+    print(f"Fetching devices from {url} with params {params}")
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()  # Raise an error for bad status codes
+    print("Devices fetched successfully")
+    return response.json()
 
+# Function to collect and update Prometheus metrics for devices
 def collect_device_metrics(devices):
-    """
-    Updates Prometheus hardware metrics for each device.
-    Only basic info here for demonstration (extend as needed).
-    """
-    device_count.set(len(devices))
-    print(f"Updating device metrics for {len(devices)} devices.")
-    for device in devices:
+    device_count.set(len(devices['data']))
+    print(f"Updating metrics for {len(devices['data'])} devices")
+    for device in devices['data']:
         hostname = device.get('hostname', 'unknown')
         architecture = device.get('architecture', 'unknown')
         device_id = device.get('id', 'unknown')
@@ -82,7 +61,7 @@ def collect_device_metrics(devices):
         serial_number = device.get('serialNumber', 'unknown')
         service_pack = device.get('servicePack', 'unknown')
 
-        # Expose device info with labels
+        # Update device info metric
         device_info.labels(
             hostname=hostname,
             architecture=architecture,
@@ -97,55 +76,56 @@ def collect_device_metrics(devices):
             servicePack=service_pack
         ).set(1)
 
-def collect_software_metrics(devices):
-    """
-    Aggregates software statistics across all devices
-    and exposes them as Prometheus metrics.
-    - Counts total installs per software
-    - Counts updated (latest version) installs
-    - Calculates percent updated
-    - Tracks all version spreads per software
-    """
-    print("Updating software metrics...")
-    sw_stats = defaultdict(lambda: defaultdict(int))
-    for device in devices:
-        for sw in device.get('software', []):
-            name = sw.get('name')
-            version = sw.get('versionRaw')
-            if name and version:
-                sw_stats[name][version] += 1
+        # Update disk info metrics
+        for disk in device.get('disks', []):
+            disk_info.labels(
+                hostname=hostname,
+                disk_id=disk.get('id', 'unknown'),
+                model=disk.get('model', 'unknown'),
+                mediaType=disk.get('mediaType', 'unknown'),
+                totalSpaceKb=disk.get('totalSpaceKb', 0)
+            ).set(1)
 
-    for sw, versions in sw_stats.items():
-        total = sum(versions.values())
-        # Determine latest version (natural order, even if string)
-        try:
-            latest = max(versions.keys(), key=lambda v: [int(x) if x.isdigit() else x for x in v.replace('.', ' ').split()])
-        except Exception:
-            latest = max(versions.keys())
-        updated = versions[latest]
-        percent = updated / total * 100 if total > 0 else 0
+        # Update driver info metrics
+        for driver in device.get('drivers', []):
+            driver_info.labels(
+                hostname=hostname,
+                driver_id=driver.get('id', 'unknown'),
+                name=driver.get('name', 'unknown'),
+                version=driver.get('version', 'unknown'),
+                provider=driver.get('provider', 'unknown')
+            ).set(1)
 
-        # Update Prometheus metrics for software
-        software_total.labels(software=sw).set(total)
-        software_updated.labels(software=sw).set(updated)
-        software_updated_percent.labels(software=sw).set(percent)
-        software_latest_version.labels(software=sw, latest_version=latest).set(1)
-        for ver, count in versions.items():
-            software_version_count.labels(software=sw, version=ver).set(count)
+        # Update Active Directory info metric
+        active_directory = device.get('activeDirectory', {})
+        if active_directory:
+            ad_info.labels(
+                hostname=hostname,
+                deviceName=active_directory.get('deviceName', 'unknown')
+            ).set(1)
+
+        # Update custom fields metrics
+        for field in device.get('customFields', []):
+            custom_fields_info.labels(
+                hostname=hostname,
+                field_name=field.get('name', 'unknown'),
+                field_value=field.get('value', 'unknown')
+            ).set(1)
+
+        print(f"Metrics updated for device: {hostname}")
 
 if __name__ == '__main__':
-    print(f"Starting Prometheus exporter on port {PORT}")
-    # Start up HTTP server to expose Prometheus metrics endpoint
-    start_http_server(PORT)
+    print("Starting Prometheus exporter")
+    # Start up the server to expose the metrics.
+    start_http_server(8000)
+    print("Prometheus exporter started on port 8000")
+    # Continuously collect metrics every 60 seconds.
     while True:
         try:
-            print("Collecting metrics from PDQ Connect API...")
+            print("Collecting metrics...")
             devices = get_devices()
             collect_device_metrics(devices)
-            collect_software_metrics(devices)
-            print("Metrics updated successfully.")
+            print("Metrics collected successfully")
         except Exception as e:
-            print(f"Error during metrics update: {e}")
-        # Wait 24 hours before the next sync
-        print(f"Waiting {SYNC_INTERVAL // 3600} hours for next sync...\n")
-        time.sleep(SYNC_INTERVAL)
+            print(f"Error collecting metrics: {e}")
+        time.sleep(60)
