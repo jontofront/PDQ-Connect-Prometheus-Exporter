@@ -3,6 +3,8 @@ import requests
 from prometheus_client import start_http_server, Gauge
 from collections import defaultdict
 
+EXPORTER_VERSION = "0.1.0"
+
 # ==================== CONFIGURATION ====================
 API_KEY = 'redacted'  # <-- Put your real PDQ API key here!
 BASE_URL = 'https://app.pdq.com/v1/api'
