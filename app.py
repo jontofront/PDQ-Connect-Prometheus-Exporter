@@ -2,6 +2,8 @@ import time
 import requests
 from prometheus_client import start_http_server, Gauge
 
+EXPORTER_VERSION = "0.1.0"
+
 # Constants
 API_KEY = 'redacted'  # Replace with your actual API key
 BASE_URL = 'https://app.pdq.com/v1/api'
