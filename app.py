@@ -25,8 +25,9 @@ custom_fields_info = Gauge('pdq_custom_fields_info', 'Custom fields information 
     'hostname', 'field_name', 'field_value'
 ])
 
-# Function to get devices from PDQ Connect API
-def get_devices():
+
+# Loops through all available pages and collects all devices
+def get_all_devices():
     url = f'{BASE_URL}/devices'
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -39,15 +40,27 @@ def get_devices():
         "sort": "insertedAt"
     }
     print(f"Fetching devices from {url} with params {params}")
-    response = requests.get(url, headers=headers, params=params)
-    response.raise_for_status()  # Raise an error for bad status codes
-    print("Devices fetched successfully")
-    return response.json()
+    all_devices = []
+    total_pages = 1
+    first = True
+    while params["page"] <= total_pages:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()  # Raise an error for bad status codes
+        data = response.json()
+        if first:
+            # On the first page, get the total number of pages
+            total_pages = data.get('meta', {}).get('pagination', {}).get('totalPages', 1)
+            first = False
+        all_devices.extend(data.get('data', []))
+        print(f"Fetched page {params['page']} of {total_pages}, devices so far: {len(all_devices)}")
+        params["page"] += 1
+    print("All devices fetched successfully")
+    return {"data": all_devices}
 
-# FFFFFFFunction to collect and update Prometheus metrics for devices
+# Function to collect and update Prometheus metrics for devices
 def collect_device_metrics(devices):
     device_count.set(len(devices['data']))
-    print(f"Updating metrics for {len(devices['data'])} devices")
+    print(f"Updating metrics for {len(devices['data'])} devices (pagination enabled)")  # Pagination log
     for device in devices['data']:
         hostname = device.get('hostname', 'unknown')
         architecture = device.get('architecture', 'unknown')
@@ -118,12 +131,12 @@ if __name__ == '__main__':
     print("Starting Prometheus exporter")
     # Start up the server to expose the metrics.
     start_http_server(8000)
-    print("Prometheus exporter for PDQ started on port 8000")
+    print("Prometheus exporter started on port 8000")
     # Continuously collect metrics every 60 seconds.
     while True:
         try:
             print("Collecting metrics...")
-            devices = get_devices()
+            devices = get_all_devices()  # CHANGED: now uses pagination function
             collect_device_metrics(devices)
             print("Metrics collected successfully")
         except Exception as e:
