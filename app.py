@@ -9,6 +9,7 @@ API_KEY = 'redacted'  # Replace with your actual API key
 BASE_URL = 'https://app.pdq.com/v1/api'
 
 # Prometheus metrics definitions
+exporter_version_info = Gauge('pdq_exporter_version_info', 'PDQ exporter version info', ['version'])
 device_count = Gauge('pdq_device_count', 'Total number of devices managed by PDQ Connect')
 device_info = Gauge('pdq_device_info', 'Basic information about the device', [
     'hostname', 'architecture', 'id', 'insertedAt', 'lastUser',
@@ -26,6 +27,7 @@ ad_info = Gauge('pdq_ad_info', 'Active Directory information about the device', 
 custom_fields_info = Gauge('pdq_custom_fields_info', 'Custom fields information about the device', [
     'hostname', 'field_name', 'field_value'
 ])
+
 
 # Function to get devices from PDQ Connect API
 def get_devices():
@@ -116,11 +118,14 @@ def collect_device_metrics(devices):
 
         print(f"Metrics updated for device: {hostname}")
 
+
 if __name__ == '__main__':
     print("Starting Prometheus exporter")
     # Start up the server to expose the metrics.
     start_http_server(8000)
     print("Prometheus exporter started on port 8000")
+    # Exporter version
+    exporter_version_info.labels(version=EXPORTER_VERSION).set(1)
     # Continuously collect metrics every 60 seconds.
     while True:
         try:
