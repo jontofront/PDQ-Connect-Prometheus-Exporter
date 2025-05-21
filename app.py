@@ -2,8 +2,6 @@ import time
 import requests
 from prometheus_client import start_http_server, Gauge
 
-
-
 # Constants
 API_KEY = 'redacted'  # Replace with your actual API key
 BASE_URL = 'https://app.pdq.com/v1/api'
@@ -26,7 +24,6 @@ ad_info = Gauge('pdq_ad_info', 'Active Directory information about the device', 
 custom_fields_info = Gauge('pdq_custom_fields_info', 'Custom fields information about the device', [
     'hostname', 'field_name', 'field_value'
 ])
-
 
 # Function to get devices from PDQ Connect API
 def get_devices():
@@ -116,7 +113,6 @@ def collect_device_metrics(devices):
             ).set(1)
 
         print(f"Metrics updated for device: {hostname}")
-
 
 if __name__ == '__main__':
     print("Starting Prometheus exporter")
