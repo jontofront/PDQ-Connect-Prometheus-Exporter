@@ -1,5 +1,7 @@
 import time
 import requests
+import socket
+import datetime
 from prometheus_client import start_http_server, Gauge
 
 EXPORTER_VERSION = "0.1.0"
@@ -121,7 +123,7 @@ def collect_device_metrics(devices):
 
 if __name__ == '__main__':
     print("Starting Prometheus exporter")
-    print(f"Exporter started at: {datetime.datetime.now().isoformat()}")
+    print(f"PDQ exporter started: {EXPORTER_VERSION} on {socket.gethostname()} at {datetime.datetime.now().isoformat()}")
     # Start up the server to expose the metrics.
     start_http_server(8000)
     print("Prometheus exporter started on port 8000")
