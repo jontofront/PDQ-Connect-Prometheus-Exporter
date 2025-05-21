@@ -121,6 +121,7 @@ def collect_device_metrics(devices):
 
 if __name__ == '__main__':
     print("Starting Prometheus exporter")
+    print(f"Exporter started at: {datetime.datetime.now().isoformat()}")
     # Start up the server to expose the metrics.
     start_http_server(8000)
     print("Prometheus exporter started on port 8000")
