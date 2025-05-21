@@ -118,7 +118,7 @@ if __name__ == '__main__':
     print("Starting Prometheus exporter")
     # Start up the server to expose the metrics.
     start_http_server(8000)
-    print("Prometheus exporter started on port 8000")
+    print("Prometheus exporter for PDQ started on port 8000")
     # Continuously collect metrics every 60 seconds.
     while True:
         try:
