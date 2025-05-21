@@ -2,14 +2,13 @@ import time
 import requests
 from prometheus_client import start_http_server, Gauge
 
-EXPORTER_VERSION = "0.1.0"
+
 
 # Constants
 API_KEY = 'redacted'  # Replace with your actual API key
 BASE_URL = 'https://app.pdq.com/v1/api'
 
 # Prometheus metrics definitions
-exporter_version_info = Gauge('pdq_exporter_version_info', 'PDQ exporter version info', ['version'])
 device_count = Gauge('pdq_device_count', 'Total number of devices managed by PDQ Connect')
 device_info = Gauge('pdq_device_info', 'Basic information about the device', [
     'hostname', 'architecture', 'id', 'insertedAt', 'lastUser',
@@ -121,12 +120,9 @@ def collect_device_metrics(devices):
 
 if __name__ == '__main__':
     print("Starting Prometheus exporter")
-    print(f"PDQ exporter started: {EXPORTER_VERSION}")
     # Start up the server to expose the metrics.
     start_http_server(8000)
     print("Prometheus exporter started on port 8000")
-    # Exporter version
-    exporter_version_info.labels(version=EXPORTER_VERSION).set(1)
     # Continuously collect metrics every 60 seconds.
     while True:
         try:
