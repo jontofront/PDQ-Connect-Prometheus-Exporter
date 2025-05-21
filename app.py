@@ -141,4 +141,4 @@ if __name__ == '__main__':
             print("Metrics collected successfully")
         except Exception as e:
             print(f"Error collecting metrics: {e}")
-        time.sleep(60)
+        time.sleep(3600)
