@@ -44,7 +44,7 @@ def get_devices():
     print("Devices fetched successfully")
     return response.json()
 
-# Function to collect and update Prometheus metrics for devices
+# FFFFFFFunction to collect and update Prometheus metrics for devices
 def collect_device_metrics(devices):
     device_count.set(len(devices['data']))
     print(f"Updating metrics for {len(devices['data'])} devices")
